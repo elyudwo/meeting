@@ -1,6 +1,6 @@
 "use client"; // 클라이언트 컴포넌트로 선언
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface Message {
   user: string;
@@ -10,10 +10,46 @@ interface Message {
 const Chat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>("");
+  const [socket, setSocket] = useState<WebSocket | null>(null);
+
+  // WebSocket 초기화
+  useEffect(() => {
+    const ws = new WebSocket("ws://localhost:5000/chat?userId=lee");
+
+    ws.onopen = () => {
+      console.log("WebSocket 연결이 열렸습니다.");
+    };
+
+    ws.onmessage = (event) => {
+      const message = JSON.parse(event.data) as Message;
+      setMessages((prev) => [...prev, message]);
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket 오류:", error);
+    };
+
+    ws.onclose = () => {
+      console.log("WebSocket 연결이 닫혔습니다.");
+    };
+
+    setSocket(ws);
+
+    // 컴포넌트 언마운트 시 WebSocket 닫기
+    return () => {
+      ws.close();
+    };
+  }, []);
 
   const sendMessage = () => {
-    if (input.trim()) {
-      setMessages([...messages, { user: "You", text: input }]);
+    if (input.trim() && socket) {
+      const message = {
+        from: "lee", // 현재 사용자 ID (보낸 사람)
+        to: "nana", // 받을 사람 ID
+        message: input, // 실제 메시지 내용
+      };
+      socket.send(JSON.stringify(message)); // 서버로 메시지 전송
+      setMessages((prev) => [...prev, { user: "You", text: input }]); // 로컬에 추가 (보낸 사람: "You")
       setInput("");
     }
   };
